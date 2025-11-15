@@ -102,8 +102,7 @@ if password == st.secrets["APP_PASSWORD"]:
                                             full_text += text + "\n\n"
                                     document_texts[file_name] = full_text
                 
-                # --- !! THIS IS THE FIXED LINE !! ---
-                # Changed the \N (which caused the error) back to \n
+                # --- Fixed the \N typo ---
                 st.session_state.full_document_text = "\n\n--- NEW DOCUMENT: {name} --- \n\n".join(
                     f"{name}\n{text}" for name, text in document_texts.items()
                 )
@@ -129,4 +128,15 @@ if password == st.secrets["APP_PASSWORD"]:
                     
                     if summary_output:
                         st.success("Analysis Complete!")
-                        st.subheader
+                        st.subheader("Your Political Briefing")
+                        
+                        # --- !! THIS IS THE FIXED LINE !! ---
+                        # Using st.write() is safer than st.markdown()
+                        st.write(summary_output)
+                    else:
+                        st.error("Analysis failed. Please check the API key in your secrets.")
+
+elif password:
+    st.error("Password incorrect. Please try again.")
+else:
+    st.info("Please enter your password to unlock the assistant.")
