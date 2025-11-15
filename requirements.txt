@@ -1,7 +1,12 @@
 streamlit
 pdfplumber
+
+# LangChain & AI
 langchain
+langchain-core
 langchain-google-genai
 google-generativeai
-langchain-core
+
+# Dependency Fixes
 pydantic
+pydantic-v1
