@@ -93,4 +93,105 @@ def show_upload_page():
                 
                 # Save the combined text to our session state "memory"
                 st.session_state.full_document_text = "\n\n--- NEW DOCUMENT: {name} --- \n\n".join(
-                    f"{name}\n{text}" for name, text in document_texts.
+                    f"{name}\n{text}" for name, text in document_texts.items()
+                )
+                st.session_state.file_read_success = True
+            
+            except zipfile.BadZipFile:
+                st.error("This does not appear to be a valid file. Please try again.")
+                st.session_state.full_document_text = None
+                st.session_state.file_read_success = False
+
+        if st.session_state.file_read_success:
+            st.success(f"Successfully read and cached {len(document_texts)} PDF document(s).")
+            # Move to the next page automatically after reading
+            st.session_state.page = "prompting"
+            st.rerun()
+
+    if st.button("Logout"):
+        st.session_state.page = "login"
+        st.rerun()
+
+def show_prompting_page():
+    """Renders the prompt customization page."""
+    st.title("Step 2: Set Prompts")
+    st.info("The text is cached. You can now customize the prompts before analysis.")
+    
+    default_persona = ("You are a veteran local politician and senior city council member "
+                       "for a local political party. Your party focusses on 'doing the "
+                       "right things and doing things right' for the community. You are "
+                       "pragmatic, financially responsible, and community-focused.")
+    st.session_state.persona_prompt = st.text_area(
+        "Generic Persona:", 
+        value=st.session_state.get("persona_prompt", default_persona), 
+        height=150
+    )
+    
+    default_instructions = ("Analyze the following documents for a city council meeting.")
+    st.session_state.instructions_prompt = st.text_area(
+        "Specific Instructions for this Analysis:", 
+        value=st.session_state.get("instructions_prompt", default_instructions), 
+        height=150
+    )
+    
+    # --- Action Buttons ---
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("Back to Upload"):
+            st.session_state.page = "upload"
+            st.rerun()
+    with col2:
+        if st.button("Start Analysis", type="primary"):
+            with st.spinner("🤖 The AI is reading all documents and thinking... This may take a minute..."):
+                st.session_state.analysis_result = analyze_text(
+                    st.secrets["GOOGLE_API_KEY"], 
+                    st.session_state.full_document_text, 
+                    st.session_state.persona_prompt, 
+                    st.session_state.instructions_prompt
+                )
+            st.session_state.page = "result"
+            st.rerun()
+
+def show_result_page():
+    """Renders the final analysis result page."""
+    st.title("Step 3: Your Political Briefing")
+    
+    if st.session_state.analysis_result:
+        if st.session_state.analysis_result.startswith("Error during AI analysis:"):
+            st.error(st.session_state.analysis_result)
+        else:
+            st.success("Analysis Complete!")
+            st.write(st.session_state.analysis_result)
+    else:
+        st.warning("No result found. Please go back and try again.")
+        
+    if st.button("Analyze Another File (Go to Upload)"):
+        # Clear the old data and go back to upload
+        st.session_state.full_document_text = None
+        st.session_state.analysis_result = None
+        st.session_state.file_read_success = None
+        st.session_state.page = "upload"
+        st.rerun()
+
+# --- 4. MAIN APP LOGIC (Page Router) ---
+# This is the "bookmark" system that controls which function to run.
+
+# Initialize session state variables
+if "page" not in st.session_state:
+    st.session_state.page = "login"
+if "full_document_text" not in st.session_state:
+    st.session_state.full_document_text = None
+if "analysis_result" not in st.session_state:
+    st.session_state.analysis_result = None
+if "file_read_success" not in st.session_state:
+    st.session_state.file_read_success = None
+
+# "Router" - Show the correct page based on the session state
+if st.session_state.page == "login":
+    show_login_page()
+elif st.session_state.page == "upload":
+    show_upload_page()
+elif st.session_state.page == "prompting":
+    show_prompting_page()
+elif st.session_state.page == "result":
+    show_result_page()
