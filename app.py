@@ -19,8 +19,6 @@ def analyze_text(api_key, text_to_analyze, persona_prompt, instructions_prompt):
         model = genai.GenerativeModel('gemini-2.5-pro')
         
         # --- DYNAMIC PROMPT (FIXED) ---
-        # We build the prompt as an f-string, using the correct
-        # variable name 'text_to_analyze' which is passed to the function.
         final_prompt = f"""
         {persona_prompt}
         
@@ -40,7 +38,6 @@ def analyze_text(api_key, text_to_analyze, persona_prompt, instructions_prompt):
         YOUR 1-PAGE BRIEFING:
         """
         
-        # We can now send this 'final_prompt' directly to the model.
         response = model.generate_content(final_prompt)
         
         return response.text
@@ -105,8 +102,9 @@ if password == st.secrets["APP_PASSWORD"]:
                                             full_text += text + "\n\n"
                                     document_texts[file_name] = full_text
                 
-                # --- NEW: Save the combined text to our "memory" ---
-                st.session_state.full_document_text = "\n\N--- NEW DOCUMENT: {name} --- \n\n".join(
+                # --- !! THIS IS THE FIXED LINE !! ---
+                # Changed the \N (which caused the error) back to \n
+                st.session_state.full_document_text = "\n\n--- NEW DOCUMENT: {name} --- \n\n".join(
                     f"{name}\n{text}" for name, text in document_texts.items()
                 )
                 st.success(f"Successfully read and cached {len(document_texts)} PDF document(s).")
@@ -131,12 +129,4 @@ if password == st.secrets["APP_PASSWORD"]:
                     
                     if summary_output:
                         st.success("Analysis Complete!")
-                        st.subheader("Your Political Briefing")
-                        st.markdown(summary_output)
-                    else:
-                        st.error("Analysis failed. Please check the API key in your secrets.")
-
-elif password:
-    st.error("Password incorrect. Please try again.")
-else:
-    st.info("Please enter your password to unlock the assistant.")
+                        st.subheader
