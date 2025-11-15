@@ -1,12 +1,10 @@
 streamlit
 pdfplumber
 
-# LangChain & AI
-langchain
-langchain-core
-langchain-google-genai
+# --- Version Pinning to fix conflicts ---
+pydantic==2.8.2
+pydantic-v1==1.11.1
+langchain==0.2.19
+langchain-core==0.2.39
+langchain-google-genai==1.0.7
 google-generativeai
-
-# Dependency Fixes
-pydantic
-pydantic-v1
