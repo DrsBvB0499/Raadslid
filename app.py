@@ -17,7 +17,7 @@ def analyze_text(api_key, text_to_analyze):
         genai.configure(api_key=api_key)
 
         # Create the model
-        model = genai.GenerativeModel('gemini-pro')
+        model = genai.GenerativeModel('gemini-1.0-pro')
 
         # This is your specific prompt
         prompt = """
@@ -114,3 +114,4 @@ elif password:
     st.error("Password incorrect. Please try again.")
 else:
     st.info("Please enter your password to unlock the assistant.")
+
