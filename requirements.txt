@@ -1,2 +1,5 @@
 streamlit
 pdfplumber
+langchain
+langchain-google-genai
+google-generativeai
