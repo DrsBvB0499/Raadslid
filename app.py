@@ -18,8 +18,10 @@ def analyze_text(api_key, text_to_analyze, persona_prompt, instructions_prompt):
         # --- THE CORRECTED MODEL NAME ---
         model = genai.GenerativeModel('gemini-2.5-pro')
         
-        # --- DYNAMIC PROMPT ---
-        prompt = f"""
+        # --- DYNAMIC PROMPT (FIXED) ---
+        # We build the prompt as an f-string, using the correct
+        # variable name 'text_to_analyze' which is passed to the function.
+        final_prompt = f"""
         {persona_prompt}
         
         {instructions_prompt}
@@ -32,16 +34,13 @@ def analyze_text(api_key, text_to_analyze, persona_prompt, instructions_prompt):
         
         Here is the text from all the documents:
         ---
-        {text}
+        {text_to_analyze} 
         ---
         
         YOUR 1-PAGE BRIEFING:
         """
         
-        # Combine the prompt and the text
-        final_prompt = prompt.format(text=text_to_analyze)
-        
-        # Send to the model and get the response
+        # We can now send this 'final_prompt' directly to the model.
         response = model.generate_content(final_prompt)
         
         return response.text
@@ -56,7 +55,6 @@ st.title("Town Hall Assistant")
 st.subheader("Your personal assistant for analyzing meeting documents.")
 
 # --- Initialize Session State ---
-# This creates the "memory" if it doesn't exist
 if "full_document_text" not in st.session_state:
     st.session_state.full_document_text = None
 if "last_uploaded_file" not in st.session_state:
@@ -76,10 +74,7 @@ if password == st.secrets["APP_PASSWORD"]:
                        "pragmatic, financially responsible, and community-focused.")
     persona_prompt = st.text_area("Generic Persona:", value=default_persona, height=150)
     
-    default_instructions = ("Analyze the following documents for a city council meeting. "
-                            "This topic has been discussed before, and our party is very "
-                            "much opposed to this idea. Analyze the information with "
-                            "that stance in mind.")
+    default_instructions = ("Analyze the following documents for a city council meeting.")
     instructions_prompt = st.text_area("Specific Instructions for this Analysis:", value=default_instructions, height=150)
 
     st.subheader("2. Upload and Analyze")
@@ -88,7 +83,6 @@ if password == st.secrets["APP_PASSWORD"]:
     if uploaded_zip is not None:
         
         # --- NEW LOGIC: Only read if it's a NEW file ---
-        # We check if the uploaded file is different from the one in memory
         if uploaded_zip.name != st.session_state.last_uploaded_file:
             st.session_state.full_document_text = None # Clear old text
             st.session_state.last_uploaded_file = uploaded_zip.name
@@ -112,23 +106,22 @@ if password == st.secrets["APP_PASSWORD"]:
                                     document_texts[file_name] = full_text
                 
                 # --- NEW: Save the combined text to our "memory" ---
-                st.session_state.full_document_text = "\n\n--- NEW DOCUMENT: {name} --- \n\n".join(
+                st.session_state.full_document_text = "\n\N--- NEW DOCUMENT: {name} --- \n\n".join(
                     f"{name}\n{text}" for name, text in document_texts.items()
                 )
                 st.success(f"Successfully read and cached {len(document_texts)} PDF document(s).")
             
             except zipfile.BadZipFile:
-                st.error("This does not appear to be a valid ZIP file. Please try again.")
+                st.error("This does not appear to be a valid file. Please try again.")
                 st.session_state.full_document_text = None
                 st.session_state.last_uploaded_file = None
 
         # --- Analysis Button ---
-        # This part now runs *after* the reading is done (or if text is already cached)
         if st.session_state.full_document_text:
             if st.button("Start Analysis"):
                 with st.spinner("🤖 The AI is reading all documents and thinking... This may take a minute..."):
                     
-                    # --- NEW: We pull the text from "memory" ---
+                    # --- We pull the text from "memory" ---
                     summary_output = analyze_text(
                         st.secrets["GOOGLE_API_KEY"], 
                         st.session_state.full_document_text, # Use the cached text
