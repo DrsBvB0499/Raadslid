@@ -1,6 +1,7 @@
 import streamlit as st
-import zipfile  # Python's built-in library for handling .zip files
-import io         # Used to handle the file in memory
+import zipfile  # For reading ZIPs
+import io         # For handling files in memory
+import pdfplumber # Our new library for reading PDFs
 
 # --- Streamlit App Layout ---
 
@@ -8,45 +9,74 @@ st.title("Town Hall Assistant")
 st.subheader("Your personal assistant for analyzing meeting documents.")
 
 # 1. Create the File Uploader
-# This 'st.file_uploader' widget is the new UI.
-# We set 'type="zip"' to only allow .zip files.
 uploaded_zip = st.file_uploader("Upload the ZIP file of meeting documents", type="zip")
 
 # 2. Add logic for what to do AFTER a file is uploaded
 if uploaded_zip is not None:
-    # 'uploaded_zip' is a file-like object from Streamlit.
-    # We use 'io.BytesIO' to treat the uploaded file's bytes as a file
-    # that 'zipfile' can read from memory.
     zip_in_memory = io.BytesIO(uploaded_zip.getvalue())
     
-    # A list to store the names of the PDFs we find
-    pdf_files_found = []
-    
+    # We'll store the text of all documents in this dictionary
+    # The 'key' will be the filename, the 'value' will be the text
+    document_texts = {} 
+
     try:
         # Open the ZIP file from memory
         with zipfile.ZipFile(zip_in_memory, 'r') as zf:
             
-            # 'zf.namelist()' gives a list of all files in the zip
             all_files_in_zip = zf.namelist()
             
-            for file_name in all_files_in_zip:
-                # We only care about files that end in .pdf
-                # We also ignore common macOS junk files just in case
-                if file_name.endswith('.pdf') and not file_name.startswith('__MACOSX'):
-                    pdf_files_found.append(file_name)
+            # --- This is the new, important part ---
+            
+            # Show a status bar as we read the files
+            progress_bar = st.progress(0, text="Reading documents...")
+            
+            pdf_files_found = [f for f in all_files_in_zip if f.endswith('.pdf') and not f.startswith('__MACOSX')]
+            
+            for i, file_name in enumerate(pdf_files_found):
+                
+                # Update progress bar
+                progress_bar.progress((i + 1) / len(pdf_files_found), text=f"Reading: {file_name}")
+
+                try:
+                    # 'zf.open(file_name)' opens the PDF *inside* the zip
+                    with zf.open(file_name) as pdf_file_in_zip:
+                        
+                        # 'pdfplumber.open()' can read this in-memory file
+                        with pdfplumber.open(pdf_file_in_zip) as pdf:
+                            
+                            full_text = "" # A variable to hold all text from this one PDF
+                            
+                            # Loop through all pages in the PDF
+                            for page in pdf.pages:
+                                # 'page.extract_text()' gets all text from a page
+                                # We add a space just in case text is cut off between pages
+                                text = page.extract_text()
+                                if text: # Only add if text was found
+                                    full_text += text + "\n\n"
+                            
+                            # Add the combined text to our dictionary
+                            document_texts[file_name] = full_text
+
+                except Exception as e:
+                    st.warning(f"Could not read {file_name}. Skipping. (Error: {e})")
+
+        # --- End of new, important part ---
+
+        progress_bar.progress(1.0, text="All documents read!")
         
         # 3. Show the results
-        if not pdf_files_found:
-            st.error("No PDF files were found inside that ZIP.")
+        if not document_texts:
+            st.error("No text could be extracted from the PDF files in that ZIP.")
         else:
-            st.success(f"Found {len(pdf_files_found)} PDF document(s) in the ZIP! 🎉")
+            st.success(f"Successfully read text from {len(document_texts)} PDF document(s)! 🎉")
             
-            with st.expander("Show found document names"):
-                for name in pdf_files_found:
-                    st.write(name)
+            with st.expander("Show extracted text summary"):
+                for file_name, text_content in document_texts.items():
+                    st.write(f"**{file_name}**")
+                    st.info(f"Read {len(text_content)} characters. (Starts with: '{text_content[:100]}...')")
             
-            # This is where we will add the *next* step:
-            st.info("Status: Ready to read and analyze these PDFs.")
+            # This is our next goal!
+            st.info("Status: Ready to send this text to the AI for analysis.")
 
     except zipfile.BadZipFile:
         st.error("This does not appear to be a valid ZIP file. Please try again.")
