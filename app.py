@@ -24,12 +24,12 @@ if 'file_cache' not in st.session_state:
 if 'file_uploader_key' not in st.session_state:
     st.session_state.file_uploader_key = None
 
-# --- Use the EXACT default persona ---
-default_persona = ("You are a veteran local politician and senior city council member "
-                   "for a local political party. Your party focusses on 'doing the "
-                   "right things and doing things right' for the community. You are "
-                   "pragmatic, financially responsible, and community-focused.")
-default_instructions = ("Analyze the following documents for a city council meeting.")
+# --- FIX: Default prompts translated to Dutch ---
+default_persona = ("Jij bent een ervaren lokaal politicus en senior gemeenteraadslid "
+                   "voor een lokale politieke partij. Jouw partij richt zich op 'de "
+                   "goede dingen doen en de dingen goed doen' voor de gemeenschap. Je bent "
+                   "pragmatisch, financieel verantwoordelijk en gemeenschapsgericht.")
+default_instructions = ("Analyseer de volgende documenten voor een gemeenteraadsvergadering.")
 
 if 'persona_prompt' not in st.session_state:
     st.session_state.persona_prompt = default_persona
@@ -83,11 +83,11 @@ else:
                     st.warning("Upload alsjeblieft eerst een of meerdere bestanden.") 
 
     # --- PAGINA 2: ANALYSE INSTRUCTIE ---
+    # (This page is unchanged from the previous fix)
     elif st.session_state.page == 2:
         st.title("Stap 2: Analyse Instructie")
         st.write("Pas hier de persona van de AI en je specifieke opdracht aan.")
         
-        # --- FIX: Explicitly set 'value' and save the result ---
         # Read the current value from session state
         persona_value = st.text_area(
             "Generieke Persona:", 
@@ -105,7 +105,6 @@ else:
         )
         # Save any changes back to session state
         st.session_state.instructions_prompt = instructions_value
-        # --- END FIX ---
 
         col1, col2 = st.columns(2)
         with col1:
@@ -114,7 +113,6 @@ else:
                 st.rerun()
         with col2:
             if st.button("Start Analyse (dit kan even duren)"): 
-                # This check will now work because the state is correctly populated
                 if st.session_state.persona_prompt and st.session_state.instructions_prompt:
                     set_page(3) 
                     st.rerun()
