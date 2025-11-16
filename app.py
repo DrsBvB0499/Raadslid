@@ -163,3 +163,97 @@ else:
         with col2:
             if st.button("Volgende Stap: Instructie"): # Dutch button
                 if 'uploaded_files' in st.session_state and st.session_state.uploaded_files:
+                    set_page(2)
+                    st.rerun()
+                else:
+                    st.warning("Upload alsjeblieft eerst een of meerdere PDF-bestanden.") # Dutch warning
+
+    # --- PAGE 2: ANALYSIS PROMPT ---
+    elif st.session_state.page == 2:
+        st.title("Stap 2: Analyse Instructie")
+        st.write("De AI zal de documenten analyseren en zoeken naar de punten die jij opgeeft. De AI zal *altijd* een samenvatting, analyse en aanbevelingen geven.")
+        
+        default_prompt = "Analyseer de documenten. Focus op de belangrijkste risico's, financiële verplichtingen en eventuele tegenstrijdigheden tussen de documenten."
+        
+        user_prompt = st.text_area(
+            "Geef hier je specifieke analyse-opdracht:", # Dutch label
+            value=default_prompt,
+            height=150,
+            key="analysis_prompt"
+        )
+
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Terug naar Upload"): # Dutch button
+                set_page(1)
+                st.rerun()
+        with col2:
+            if st.button("Start Analyse (dit kan even duren)"): # Dutch button
+                if 'analysis_prompt' in st.session_state and st.session_state.analysis_prompt:
+                    set_page(3) 
+                    st.rerun()
+                else:
+                    st.warning("Geef alsjeblieft een instructie op.") # Dutch warning
+
+    # --- PAGE 3: RESULTS ---
+    elif st.session_state.page == 3:
+        st.title("Stap 3: Analyse Resultaten")
+        
+        # Run the analysis ONCE and store the result
+        if not st.session_state.final_analysis:
+            # 1. Check if all required data is present
+            if 'uploaded_files' not in st.session_state or not st.session_state.uploaded_files:
+                st.error("Geen bestanden gevonden. Ga terug naar de uploadpagina.") # Dutch error
+                set_page(1)
+            elif 'analysis_prompt' not in st.session_state or not st.session_state.analysis_prompt:
+                st.error("Geen analyse-instructie gevonden. Ga terug naar de instructiepagina.") # Dutch error
+                set_page(2)
+            else:
+                # 2. Start the analysis (with a spinner)
+                with st.spinner("Analyse wordt uitgevoerd... Dit kan enkele minuten duren, afhankelijk van de grootte van de documenten."): # Dutch spinner text
+                    try:
+                        # Step A: Read PDFs with citations
+                        st.write("Documenten lezen en voorbereiden...") # Dutch feedback
+                        documents_text = get_pdf_text_with_citations(st.session_state.uploaded_files)
+                        
+                        if documents_text:
+                            # Step B: Call the AI (no API key passed as arg)
+                            st.write("AI-analyse gestart...") # Dutch feedback
+                            analysis_result = get_gemini_analysis(
+                                SYSTEM_PROMPT_NL,
+                                documents_text,
+                                st.session_state.analysis_prompt
+                            )
+                            
+                            if analysis_result:
+                                st.session_state.final_analysis = analysis_result
+                                st.success("Analyse voltooid!") # Dutch success
+                            else:
+                                st.error("De AI kon geen resultaat genereren.") # Dutch error
+                                st.session_state.final_analysis = "Analyse mislukt." # Dutch state
+                        
+                        else:
+                            st.error("Kon geen tekst uit de documenten lezen.") # Dutch error
+                            st.session_state.final_analysis = "Analyse mislukt: geen tekst gevonden." # Dutch state
+                    
+                    except Exception as e:
+                        st.exception(f"Er is een onverwachte fout opgetreden: {e}")
+                        st.session_state.final_analysis = f"Analyse mislukt: {e}" # Dutch state
+
+        # 3. Display the final result
+        st.markdown("---")
+        st.subheader("Uw Volledige Analyse") # Dutch subheader
+        st.markdown(st.session_state.final_analysis)
+        
+        # Button to start a new analysis
+        if st.button("Nieuwe Analyse Starten"): # Dutch button
+            # Reset all states except for login
+            st.session_state.page = 1
+            st.session_state.uploaded_files = []
+            st.session_state.analysis_prompt = ""
+            st.session_state.final_analysis = ""
+            st.rerun() # Force a page reload
+        
+        if st.button("Uitloggen"): # Dutch button
+            logout()
+            st.rerun()
