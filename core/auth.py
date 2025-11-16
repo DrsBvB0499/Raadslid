@@ -1,7 +1,7 @@
 # core/auth.py
 import streamlit as st
 
-def check_password():
+ddef check_password():
     """Returns True if user has entered the correct password."""
     
     password_input = st.text_input("Wachtwoord", type="password", key="login_password") 
@@ -11,9 +11,10 @@ def check_password():
             # Check the password against the English-named secret
             if password_input == st.secrets["APP_PASSWORD"]:
                 st.session_state.logged_in = True
-                st.rerun()
+                st.session_state.page = 1  # <-- ADD THIS LINE
+                st.rerun() 
             else:
-                st.error("Wachtwoord onjuist.") 
+                st.error("Wachtwoord onjuist.")
         except KeyError:
             st.error("Fout: 'APP_PASSWORD' niet gevonden in Streamlit Secrets. De applicatie is niet correct geconfigureerd.")
         except Exception as e:
