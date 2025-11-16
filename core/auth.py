@@ -8,13 +8,12 @@ def check_password():
 
     if st.button("Inloggen"): 
         try:
-            # Check the password against the English-named secret
             if password_input == st.secrets["APP_PASSWORD"]:
                 st.session_state.logged_in = True
-                st.session_state.page = 1  # <-- ADD THIS LINE
+                st.session_state.page = 1
                 st.rerun() 
             else:
-                st.error("Wachtwoord onjuist.")
+                st.error("Wachtwoord onjuist.") 
         except KeyError:
             st.error("Fout: 'APP_PASSWORD' niet gevonden in Streamlit Secrets. De applicatie is niet correct geconfigureerd.")
         except Exception as e:
@@ -22,12 +21,17 @@ def check_password():
 
     return False
 
+
 def logout():
     """Logs the user out and resets the session."""
     st.session_state.logged_in = False
     st.session_state.page = 0
     st.session_state.final_analysis = ""
     st.session_state.file_cache = []
-    st.session_state.file_uploader_key = None # or []
-    if 'analysis_prompt' in st.session_state:
-        st.session_state.analysis_prompt = ""
+    st.session_state.file_uploader_key = None
+    
+    # --- Clear the correct prompt keys ---
+    if 'persona_prompt' in st.session_state:
+        del st.session_state.persona_prompt
+    if 'instructions_prompt' in st.session_state:
+        del st.session_state.instructions_prompt
