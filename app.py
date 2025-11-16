@@ -2,8 +2,8 @@ import streamlit as st
 import google.generativeai as genai
 from PyPDF2 import PdfReader
 import os
-import zipfile  # Add this import
-import io       # Add this import
+import zipfile
+import io
 
 # --- PAGINA CONFIGURATIE ---
 st.set_page_config(
@@ -13,6 +13,7 @@ st.set_page_config(
 )
 
 # --- CORE FUNCTIONS ---
+# (process_uploaded_files and get_gemini_analysis are UNCHANGED from V.06)
 
 def process_uploaded_files(uploaded_files):
     """
@@ -26,10 +27,9 @@ def process_uploaded_files(uploaded_files):
         
     for uploaded_file in uploaded_files:
         filename = uploaded_file.name
-        st.write(f"Verwerken van: {filename}...") # Dutch: User feedback
+        st.write(f"Verwerken van: {filename}...") 
         
         try:
-            # --- LOGIC FOR PDF FILES ---
             if uploaded_file.type == "application/pdf":
                 reader = PdfReader(uploaded_file)
                 for page_num, page in enumerate(reader.pages):
@@ -39,38 +39,35 @@ def process_uploaded_files(uploaded_files):
                         full_text += page_text
                         full_text += f"\n--- EINDE BRON: {filename} (Pagina {page_num + 1}) ---\n"
 
-            # --- LOGIC FOR ZIP FILES ---
             elif uploaded_file.type == "application/zip":
+                # Reset buffer position just in case
+                uploaded_file.seek(0)
                 with zipfile.ZipFile(io.BytesIO(uploaded_file.read()), 'r') as zf:
                     for internal_file_info in zf.infolist():
-                        # Skip directories and non-PDF files
                         if internal_file_info.is_dir() or not internal_file_info.filename.lower().endswith('.pdf'):
                             continue
                         
                         internal_filename = internal_file_info.filename
-                        st.write(f"  ... Verwerken (in ZIP): {internal_filename}") # Dutch: User feedback
+                        st.write(f"  ... Verwerken (in ZIP): {internal_filename}") 
                         
-                        # Read the PDF file from within the ZIP
                         with zf.open(internal_file_info) as pdf_file_in_zip:
-                            # Use io.BytesIO to make it a file-like object for PdfReader
                             pdf_stream = io.BytesIO(pdf_file_in_zip.read())
                             try:
                                 reader = PdfReader(pdf_stream)
                                 for page_num, page in enumerate(reader.pages):
                                     page_text = page.extract_text()
                                     if page_text:
-                                        # Create a nested citation
                                         citation_name = f"{filename} -> {internal_filename}"
                                         full_text += f"\n\n--- START BRON: {citation_name} (Pagina {page_num + 1}) ---\n"
                                         full_text += page_text
                                         full_text += f"\n--- EINDE BRON: {citation_name} (Pagina {page_num + 1}) ---\n"
                             except Exception as e_pdf:
-                                st.warning(f"Kon {internal_filename} in de ZIP niet lezen: {e_pdf}") # Dutch
+                                st.warning(f"Kon {internal_filename} in de ZIP niet lezen: {e_pdf}") 
                                 
         except Exception as e_file:
-            st.error(f"Fout bij het lezen van {filename}: {e_file}") # Dutch
+            st.error(f"Fout bij het lezen van {filename}: {e_file}") 
             
-    st.write("Alle documenten zijn verwerkt.") # Dutch
+    st.write("Alle documenten zijn verwerkt.") 
     return full_text
 
 def get_gemini_analysis(system_prompt, documents_text, user_prompt):
@@ -100,7 +97,7 @@ def get_gemini_analysis(system_prompt, documents_text, user_prompt):
         return None
 
 # --- SYSTEM PROMPT (BRAINS OF THE AI) ---
-# (This is unchanged, remains in Dutch)
+# (UNCHANGED)
 SYSTEM_PROMPT_NL = """
 Jij bent een deskundige, professionele analist. Je spreekt en schrijft uitsluitend Nederlands.
 Je taak is om de verstrekte documenten diepgaand te analyseren. Deze documenten zijn gemarkeerd met '--- START BRON: [bestandsnaam] (Pagina [nummer]) ---'.
@@ -124,14 +121,18 @@ Het rapport MOET de volgende structuur hebben:
 
 # --- APPLICATION STRUCTURE (WIZARD-STYLE) ---
 
-# (This section is unchanged from V.05)
+# Initialize states
 if 'page' not in st.session_state:
     st.session_state.page = 0
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 if 'final_analysis' not in st.session_state:
     st.session_state.final_analysis = ""
+# --- FIX: New state variable for our files ---
+if 'file_cache' not in st.session_state:
+    st.session_state.file_cache = []
 
+# Helper functions
 def set_page(page_num):
     st.session_state.page = page_num
 
@@ -139,13 +140,13 @@ def logout():
     st.session_state.logged_in = False
     st.session_state.page = 0
     st.session_state.final_analysis = ""
-    if 'uploaded_files' in st.session_state:
-        st.session_state.uploaded_files = []
+    # --- FIX: Clear our new file_cache ---
+    st.session_state.file_cache = []
     if 'analysis_prompt' in st.session_state:
         st.session_state.analysis_prompt = ""
 
 # --- PAGE 0: "LOGIN" (APP PASSWORD) ---
-# (This is unchanged from V.05)
+# (UNCHANGED)
 if not st.session_state.logged_in:
     st.image("https://g.co/gemini/share/fac302bc8f46", width=150) 
     st.title("Welkom bij de Analyse Agent")
@@ -170,13 +171,15 @@ else:
     # --- PAGE 1: DOCUMENT UPLOAD ---
     if st.session_state.page == 1:
         st.title("Stap 1: Documenten Uploaden")
-        st.write("Upload een of meerdere PDF-bestanden die je wilt analyseren. Je kunt ook een ZIP-bestand uploaden dat PDF's bevat.") # Updated text
+        st.write("Upload een of meerdere PDF-bestanden die je wilt analyseren. Je kunt ook een ZIP-bestand uploaden dat PDF's bevat.")
         
-        uploaded_files = st.file_uploader(
-            "Kies je PDF- of ZIP-bestanden", # Updated label
-            type=["pdf", "zip"],            # --- THIS IS THE KEY CHANGE ---
+        # --- FIX: Remove key= and just use the widget's return value ---
+        uploaded_files_widget = st.file_uploader(
+            "Kies je PDF- of ZIP-bestanden",
+            type=["pdf", "zip"],
             accept_multiple_files=True,
-            key="uploaded_files"
+            # We use our own cache, so we can set the default to that
+            value=st.session_state.file_cache  
         )
 
         col1, col2 = st.columns([1, 1])
@@ -185,15 +188,20 @@ else:
                 logout()
                 st.rerun()
         with col2:
+            # --- FIX: Logic changed to use the widget variable ---
             if st.button("Volgende Stap: Instructie"): 
-                if 'uploaded_files' in st.session_state and st.session_state.uploaded_files:
+                if uploaded_files_widget:
+                    # Manually save the files to our cache
+                    st.session_state.file_cache = uploaded_files_widget
                     set_page(2)
                     st.rerun()
                 else:
-                    st.warning("Upload alsjeblieft eerst een of meerdere bestanden.") # Updated warning
+                    # Clear the cache if the user removed all files
+                    st.session_state.file_cache = [] 
+                    st.warning("Upload alsjeblieft eerst een of meerdere bestanden.") 
 
     # --- PAGE 2: ANALYSIS PROMPT ---
-    # (This is unchanged from V.05)
+    # (UNCHANGED)
     elif st.session_state.page == 2:
         st.title("Stap 2: Analyse Instructie")
         st.write("De AI zal de documenten analyseren en zoeken naar de punten die jij opgeeft. De AI zal *altijd* een samenvatting, analyse en aanbevelingen geven.")
@@ -222,23 +230,24 @@ else:
         st.title("Stap 3: Analyse Resultaten")
         
         if not st.session_state.final_analysis:
-            if 'uploaded_files' not in st.session_state or not st.session_state.uploaded_files:
+            # --- FIX: Check our 'file_cache' instead of 'uploaded_files' ---
+            if 'file_cache' not in st.session_state or not st.session_state.file_cache:
                 st.error("Geen bestanden gevonden. Ga terug naar de uploadpagina.") 
                 set_page(1)
+            # (End fix)
+            
             elif 'analysis_prompt' not in st.session_state or not st.session_state.analysis_prompt:
                 st.error("Geen analyse-instructie gevonden. Ga terug naar de instructiepagina.") 
                 set_page(2)
             else:
                 with st.spinner("Analyse wordt uitgevoerd... Dit kan enkele minuten duren, afhankelijk van de grootte van de documenten."): 
                     try:
-                        # Step A: Read PDFs and ZIPs with citations
                         st.write("Documenten lezen en voorbereiden...") 
                         
-                        # --- THIS IS THE KEY CHANGE ---
-                        documents_text = process_uploaded_files(st.session_state.uploaded_files)
+                        # --- FIX: Process files from our 'file_cache' ---
+                        documents_text = process_uploaded_files(st.session_state.file_cache)
                         
                         if documents_text:
-                            # Step B: Call the AI
                             st.write("AI-analyse gestart...") 
                             analysis_result = get_gemini_analysis(
                                 SYSTEM_PROMPT_NL,
@@ -252,7 +261,7 @@ else:
                                 st.error("De AI kon geen resultaat genereren.") 
                                 st.session_state.final_analysis = "Analyse mislukt." 
                         else:
-                            st.error("Kon geen tekst uit de documenten lezen. Zorg dat de bestanden (of ZIPs) leesbare PDF's bevatten.") # Updated error
+                            st.error("Kon geen tekst uit de documenten lezen. Zorg dat de bestanden (of ZIPs) leesbare PDF's bevatten.") 
                             st.session_state.final_analysis = "Analyse mislukt: geen tekst gevonden." 
                     
                     except Exception as e:
@@ -266,7 +275,8 @@ else:
         
         if st.button("Nieuwe Analyse Starten"): 
             st.session_state.page = 1
-            st.session_state.uploaded_files = []
+            # --- FIX: Clear our 'file_cache' ---
+            st.session_state.file_cache = []
             st.session_state.analysis_prompt = ""
             st.session_state.final_analysis = ""
             st.rerun() 
