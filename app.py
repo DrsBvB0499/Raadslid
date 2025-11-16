@@ -13,7 +13,7 @@ st.set_page_config(
 )
 
 # --- CORE FUNCTIONS ---
-# (process_uploaded_files and get_gemini_analysis are UNCHANGED from V.06)
+# (process_uploaded_files and get_gemini_analysis are UNCHANGED from V.06/V.07)
 
 def process_uploaded_files(uploaded_files):
     """
@@ -30,6 +30,8 @@ def process_uploaded_files(uploaded_files):
         st.write(f"Verwerken van: {filename}...") 
         
         try:
+            # Must reset buffer position for reading
+            uploaded_file.seek(0)
             if uploaded_file.type == "application/pdf":
                 reader = PdfReader(uploaded_file)
                 for page_num, page in enumerate(reader.pages):
@@ -40,8 +42,6 @@ def process_uploaded_files(uploaded_files):
                         full_text += f"\n--- EINDE BRON: {filename} (Pagina {page_num + 1}) ---\n"
 
             elif uploaded_file.type == "application/zip":
-                # Reset buffer position just in case
-                uploaded_file.seek(0)
                 with zipfile.ZipFile(io.BytesIO(uploaded_file.read()), 'r') as zf:
                     for internal_file_info in zf.infolist():
                         if internal_file_info.is_dir() or not internal_file_info.filename.lower().endswith('.pdf'):
@@ -131,17 +131,26 @@ if 'final_analysis' not in st.session_state:
 # --- FIX: New state variable for our files ---
 if 'file_cache' not in st.session_state:
     st.session_state.file_cache = []
+# --- FIX: Key for the uploader widget itself ---
+if 'file_uploader_key' not in st.session_state:
+    st.session_state.file_uploader_key = None # or []
+
 
 # Helper functions
 def set_page(page_num):
     st.session_state.page = page_num
 
+# --- FIX: Callback function to keep file cache in sync ---
+def save_files_to_cache():
+    """Called when file_uploader changes. Syncs widget state to cache."""
+    st.session_state.file_cache = st.session_state.file_uploader_key
+
 def logout():
     st.session_state.logged_in = False
     st.session_state.page = 0
     st.session_state.final_analysis = ""
-    # --- FIX: Clear our new file_cache ---
     st.session_state.file_cache = []
+    st.session_state.file_uploader_key = None # or []
     if 'analysis_prompt' in st.session_state:
         st.session_state.analysis_prompt = ""
 
@@ -173,13 +182,13 @@ else:
         st.title("Stap 1: Documenten Uploaden")
         st.write("Upload een of meerdere PDF-bestanden die je wilt analyseren. Je kunt ook een ZIP-bestand uploaden dat PDF's bevat.")
         
-        # --- FIX: Remove key= and just use the widget's return value ---
-        uploaded_files_widget = st.file_uploader(
+        # --- FIX: Added key and on_change. Removed invalid 'value' arg. ---
+        st.file_uploader(
             "Kies je PDF- of ZIP-bestanden",
             type=["pdf", "zip"],
             accept_multiple_files=True,
-            # We use our own cache, so we can set the default to that
-            value=st.session_state.file_cache  
+            key="file_uploader_key",       # Key for the callback
+            on_change=save_files_to_cache  # Run function on change
         )
 
         col1, col2 = st.columns([1, 1])
@@ -188,16 +197,12 @@ else:
                 logout()
                 st.rerun()
         with col2:
-            # --- FIX: Logic changed to use the widget variable ---
+            # --- FIX: Logic is now simpler. Just check the cache. ---
             if st.button("Volgende Stap: Instructie"): 
-                if uploaded_files_widget:
-                    # Manually save the files to our cache
-                    st.session_state.file_cache = uploaded_files_widget
+                if st.session_state.file_cache: # Check our reliable cache
                     set_page(2)
                     st.rerun()
                 else:
-                    # Clear the cache if the user removed all files
-                    st.session_state.file_cache = [] 
                     st.warning("Upload alsjeblieft eerst een of meerdere bestanden.") 
 
     # --- PAGE 2: ANALYSIS PROMPT ---
@@ -230,7 +235,7 @@ else:
         st.title("Stap 3: Analyse Resultaten")
         
         if not st.session_state.final_analysis:
-            # --- FIX: Check our 'file_cache' instead of 'uploaded_files' ---
+            # --- FIX: Check our reliable 'file_cache' ---
             if 'file_cache' not in st.session_state or not st.session_state.file_cache:
                 st.error("Geen bestanden gevonden. Ga terug naar de uploadpagina.") 
                 set_page(1)
@@ -244,7 +249,7 @@ else:
                     try:
                         st.write("Documenten lezen en voorbereiden...") 
                         
-                        # --- FIX: Process files from our 'file_cache' ---
+                        # --- FIX: Process files from our reliable 'file_cache' ---
                         documents_text = process_uploaded_files(st.session_state.file_cache)
                         
                         if documents_text:
@@ -275,8 +280,8 @@ else:
         
         if st.button("Nieuwe Analyse Starten"): 
             st.session_state.page = 1
-            # --- FIX: Clear our 'file_cache' ---
             st.session_state.file_cache = []
+            st.session_state.file_uploader_key = None # or []
             st.session_state.analysis_prompt = ""
             st.session_state.final_analysis = ""
             st.rerun() 
