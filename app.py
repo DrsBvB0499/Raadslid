@@ -56,6 +56,7 @@ if not st.session_state.logged_in:
 # --- HOOFD APPLICATIE (NA INLOGGEN) ---
 else:
     # --- PAGINA 1: DOCUMENTEN UPLOADEN ---
+    # (This page is unchanged)
     if st.session_state.page == 1:
         st.title("Stap 1: Documenten Uploaden")
         st.write("Upload een of meerdere PDF-bestanden die je wilt analyseren. Je kunt ook een ZIP-bestand uploaden dat PDF's bevat.")
@@ -86,17 +87,25 @@ else:
         st.title("Stap 2: Analyse Instructie")
         st.write("Pas hier de persona van de AI en je specifieke opdracht aan.")
         
-        st.text_area(
+        # --- FIX: Explicitly set 'value' and save the result ---
+        # Read the current value from session state
+        persona_value = st.text_area(
             "Generieke Persona:", 
-            key="persona_prompt",
+            value=st.session_state.persona_prompt,
             height=150
         )
-        
-        st.text_area(
+        # Save any changes back to session state
+        st.session_state.persona_prompt = persona_value
+
+        # Read the current value from session state
+        instructions_value = st.text_area(
             "Specifieke Instructies voor deze Analyse:", 
-            key="instructions_prompt",
+            value=st.session_state.instructions_prompt,
             height=150
         )
+        # Save any changes back to session state
+        st.session_state.instructions_prompt = instructions_value
+        # --- END FIX ---
 
         col1, col2 = st.columns(2)
         with col1:
@@ -105,6 +114,7 @@ else:
                 st.rerun()
         with col2:
             if st.button("Start Analyse (dit kan even duren)"): 
+                # This check will now work because the state is correctly populated
                 if st.session_state.persona_prompt and st.session_state.instructions_prompt:
                     set_page(3) 
                     st.rerun()
@@ -112,6 +122,7 @@ else:
                     st.warning("Zorg dat beide instructievelden zijn ingevuld.") 
 
     # --- PAGINA 3: RESULTATEN ---
+    # (This page is unchanged)
     elif st.session_state.page == 3:
         st.title("Stap 3: Analyse Resultaten")
         
