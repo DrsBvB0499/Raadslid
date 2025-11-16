@@ -4,6 +4,8 @@ import os
 from core.auth import check_password, logout
 from core.file_processing import process_uploaded_files
 from core.analysis import get_gemini_analysis
+# --- FIX: Import our new HTML function ---
+from core.output import create_html_download 
 
 # --- PAGINA CONFIGURATIE ---
 st.set_page_config(
@@ -13,6 +15,7 @@ st.set_page_config(
 )
 
 # --- STATE INITIALISATIE ---
+# (Dit hele blok is ongewijzigd)
 if 'page' not in st.session_state:
     st.session_state.page = 0
 if 'logged_in' not in st.session_state:
@@ -24,7 +27,6 @@ if 'file_cache' not in st.session_state:
 if 'file_uploader_key' not in st.session_state:
     st.session_state.file_uploader_key = None
 
-# --- FIX: Default prompts translated to Dutch ---
 default_persona = ("Jij bent een ervaren lokaal politicus en senior gemeenteraadslid "
                    "voor een lokale politieke partij. Jouw partij richt zich op 'de "
                    "goede dingen doen en de dingen goed doen' voor de gemeenschap. Je bent "
@@ -38,6 +40,7 @@ if 'instructions_prompt' not in st.session_state:
 
 
 # --- HELPER FUNCTIES ---
+# (Dit blok is ongewijzigd)
 def set_page(page_num):
     st.session_state.page = page_num
 
@@ -47,6 +50,7 @@ def save_files_to_cache():
 
 
 # --- PAGINA 0: "LOGIN" ---
+# (Deze pagina is ongewijzigd)
 if not st.session_state.logged_in:
     st.image("https://g.co/gemini/share/fac302bc8f46", width=150) 
     st.title("Welkom bij de Analyse Agent")
@@ -56,7 +60,7 @@ if not st.session_state.logged_in:
 # --- HOOFD APPLICATIE (NA INLOGGEN) ---
 else:
     # --- PAGINA 1: DOCUMENTEN UPLOADEN ---
-    # (This page is unchanged)
+    # (Deze pagina is ongewijzigd)
     if st.session_state.page == 1:
         st.title("Stap 1: Documenten Uploaden")
         st.write("Upload een of meerdere PDF-bestanden die je wilt analyseren. Je kunt ook een ZIP-bestand uploaden dat PDF's bevat.")
@@ -83,27 +87,23 @@ else:
                     st.warning("Upload alsjeblieft eerst een of meerdere bestanden.") 
 
     # --- PAGINA 2: ANALYSE INSTRUCTIE ---
-    # (This page is unchanged from the previous fix)
+    # (Deze pagina is ongewijzigd)
     elif st.session_state.page == 2:
         st.title("Stap 2: Analyse Instructie")
         st.write("Pas hier de persona van de AI en je specifieke opdracht aan.")
         
-        # Read the current value from session state
         persona_value = st.text_area(
             "Generieke Persona:", 
             value=st.session_state.persona_prompt,
             height=150
         )
-        # Save any changes back to session state
         st.session_state.persona_prompt = persona_value
 
-        # Read the current value from session state
         instructions_value = st.text_area(
             "Specifieke Instructies voor deze Analyse:", 
             value=st.session_state.instructions_prompt,
             height=150
         )
-        # Save any changes back to session state
         st.session_state.instructions_prompt = instructions_value
 
         col1, col2 = st.columns(2)
@@ -120,10 +120,10 @@ else:
                     st.warning("Zorg dat beide instructievelden zijn ingevuld.") 
 
     # --- PAGINA 3: RESULTATEN ---
-    # (This page is unchanged)
     elif st.session_state.page == 3:
         st.title("Stap 3: Analyse Resultaten")
         
+        # (Dit analyse-blok is ongewijzigd)
         if not st.session_state.final_analysis:
             if not st.session_state.file_cache:
                 st.error("Geen bestanden gevonden. Ga terug naar de uploadpagina.") 
@@ -164,6 +164,20 @@ else:
         st.markdown("---")
         st.subheader("Uw Volledige Analyse") 
         st.markdown(st.session_state.final_analysis)
+        
+        # --- FIX: Vervang de .txt knop door de .html knop ---
+        if st.session_state.final_analysis:
+            # Creëer de HTML-inhoud
+            html_content = create_html_download(
+                st.session_state.final_analysis,
+                title="Analyse Raadsstukken"
+            )
+            st.download_button(
+                label="Download Analyse (.html)",
+                data=html_content,           # De HTML-string
+                file_name="analyse.html",    # De bestandsnaam
+                mime="text/html"             # Het bestandstype
+            )
         
         if st.button("Nieuwe Analyse Starten"): 
             st.session_state.page = 1
