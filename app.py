@@ -2,8 +2,10 @@ import streamlit as st
 import google.generativeai as genai
 from PyPDF2 import PdfReader
 import os
+import zipfile  # Add this import
+import io       # Add this import
 
-# --- PAGE CONFIGURATION ---
+# --- PAGINA CONFIGURATIE ---
 st.set_page_config(
     page_title="Analyse Agent",
     page_icon="🤖",
@@ -12,35 +14,63 @@ st.set_page_config(
 
 # --- CORE FUNCTIONS ---
 
-def get_pdf_text_with_citations(uploaded_files):
+def process_uploaded_files(uploaded_files):
     """
-    Reads all uploaded PDF files and extracts text.
-    Adds a clear source citation (filename + page number) 
-    before the text of each page.
+    Reads all uploaded files (PDFs and ZIPs) and extracts text.
+    For ZIPs, it finds and processes PDFs inside them.
+    Adds clear source citations (filename + page number) for all text.
     """
     full_text = ""
     if not uploaded_files:
         return ""
         
     for uploaded_file in uploaded_files:
+        filename = uploaded_file.name
+        st.write(f"Verwerken van: {filename}...") # Dutch: User feedback
+        
         try:
-            filename = uploaded_file.name
-            st.write(f"Verwerken van: {filename}...") # Dutch: User feedback
+            # --- LOGIC FOR PDF FILES ---
+            if uploaded_file.type == "application/pdf":
+                reader = PdfReader(uploaded_file)
+                for page_num, page in enumerate(reader.pages):
+                    page_text = page.extract_text()
+                    if page_text:
+                        full_text += f"\n\n--- START BRON: {filename} (Pagina {page_num + 1}) ---\n"
+                        full_text += page_text
+                        full_text += f"\n--- EINDE BRON: {filename} (Pagina {page_num + 1}) ---\n"
 
-            reader = PdfReader(uploaded_file)
+            # --- LOGIC FOR ZIP FILES ---
+            elif uploaded_file.type == "application/zip":
+                with zipfile.ZipFile(io.BytesIO(uploaded_file.read()), 'r') as zf:
+                    for internal_file_info in zf.infolist():
+                        # Skip directories and non-PDF files
+                        if internal_file_info.is_dir() or not internal_file_info.filename.lower().endswith('.pdf'):
+                            continue
+                        
+                        internal_filename = internal_file_info.filename
+                        st.write(f"  ... Verwerken (in ZIP): {internal_filename}") # Dutch: User feedback
+                        
+                        # Read the PDF file from within the ZIP
+                        with zf.open(internal_file_info) as pdf_file_in_zip:
+                            # Use io.BytesIO to make it a file-like object for PdfReader
+                            pdf_stream = io.BytesIO(pdf_file_in_zip.read())
+                            try:
+                                reader = PdfReader(pdf_stream)
+                                for page_num, page in enumerate(reader.pages):
+                                    page_text = page.extract_text()
+                                    if page_text:
+                                        # Create a nested citation
+                                        citation_name = f"{filename} -> {internal_filename}"
+                                        full_text += f"\n\n--- START BRON: {citation_name} (Pagina {page_num + 1}) ---\n"
+                                        full_text += page_text
+                                        full_text += f"\n--- EINDE BRON: {citation_name} (Pagina {page_num + 1}) ---\n"
+                            except Exception as e_pdf:
+                                st.warning(f"Kon {internal_filename} in de ZIP niet lezen: {e_pdf}") # Dutch
+                                
+        except Exception as e_file:
+            st.error(f"Fout bij het lezen van {filename}: {e_file}") # Dutch
             
-            for page_num, page in enumerate(reader.pages):
-                page_text = page.extract_text()
-                if page_text:
-                    # This is the crucial part for citations
-                    full_text += f"\n\n--- START BRON: {filename} (Pagina {page_num + 1}) ---\n"
-                    full_text += page_text
-                    full_text += f"\n--- EINDE BRON: {filename} (Pagina {page_num + 1}) ---\n"
-                    
-        except Exception as e:
-            st.error(f"Fout bij het lezen van {filename}: {e}") # Dutch: User feedback
-            
-    st.write("Alle documenten zijn verwerkt.") # Dutch: User feedback
+    st.write("Alle documenten zijn verwerkt.") # Dutch
     return full_text
 
 def get_gemini_analysis(system_prompt, documents_text, user_prompt):
@@ -49,7 +79,6 @@ def get_gemini_analysis(system_prompt, documents_text, user_prompt):
     Securely fetches the API key from Streamlit Secrets.
     """
     try:
-        # Securely fetch the API key from secrets
         api_key = st.secrets["GEMINI_API_KEY"]
         genai.configure(api_key=api_key)
         
@@ -57,22 +86,21 @@ def get_gemini_analysis(system_prompt, documents_text, user_prompt):
         
         prompt_content = [
             system_prompt,
-            f"\n--- SPECIFIEKE OPDRACHT VAN DE GEBRUIKER ---\n{user_prompt}", # Dutch: Part of the prompt
-            "\n--- START VOLLEDIGE TEKST DOCUMENTEN ---\n" + documents_text  # Dutch: Part of the prompt
+            f"\n--- SPECIFIEKE OPDRACHT VAN DE GEBRUIKER ---\n{user_prompt}", 
+            "\n--- START VOLLEDIGE TEKST DOCUMENTEN ---\n" + documents_text
         ]
         
         response = model.generate_content(prompt_content)
         return response.text
     except KeyError:
-        # User-facing error message in Dutch
         st.error("Fout: 'GEMINI_API_KEY' niet gevonden in Streamlit Secrets. Zorg dat deze correct is ingesteld.")
         return None
     except Exception as e:
-        st.error(f"AI-analyse mislukt: {e}") # Dutch: User feedback
+        st.error(f"AI-analyse mislukt: {e}") 
         return None
 
 # --- SYSTEM PROMPT (BRAINS OF THE AI) ---
-# This prompt remains in Dutch to force the AI's output to be Dutch.
+# (This is unchanged, remains in Dutch)
 SYSTEM_PROMPT_NL = """
 Jij bent een deskundige, professionele analist. Je spreekt en schrijft uitsluitend Nederlands.
 Je taak is om de verstrekte documenten diepgaand te analyseren. Deze documenten zijn gemarkeerd met '--- START BRON: [bestandsnaam] (Pagina [nummer]) ---'.
@@ -96,7 +124,7 @@ Het rapport MOET de volgende structuur hebben:
 
 # --- APPLICATION STRUCTURE (WIZARD-STYLE) ---
 
-# Initialize states
+# (This section is unchanged from V.05)
 if 'page' not in st.session_state:
     st.session_state.page = 0
 if 'logged_in' not in st.session_state:
@@ -104,7 +132,6 @@ if 'logged_in' not in st.session_state:
 if 'final_analysis' not in st.session_state:
     st.session_state.final_analysis = ""
 
-# Helper functions for page navigation
 def set_page(page_num):
     st.session_state.page = page_num
 
@@ -112,148 +139,138 @@ def logout():
     st.session_state.logged_in = False
     st.session_state.page = 0
     st.session_state.final_analysis = ""
-    # Reset other states if they exist
     if 'uploaded_files' in st.session_state:
         st.session_state.uploaded_files = []
     if 'analysis_prompt' in st.session_state:
         st.session_state.analysis_prompt = ""
 
 # --- PAGE 0: "LOGIN" (APP PASSWORD) ---
+# (This is unchanged from V.05)
 if not st.session_state.logged_in:
-    st.image("https://g.co/gemini/share/fac302bc8f46", width=150) # Replace with your logo if desired
+    st.image("https://g.co/gemini/share/fac302bc8f46", width=150) 
     st.title("Welkom bij de Analyse Agent")
     st.write("Voer het wachtwoord in om de applicatie te gebruiken.")
+    password_input = st.text_input("Wachtwoord", type="password", key="login_password") 
 
-    password_input = st.text_input("Wachtwoord", type="password", key="login_password") # Dutch label
-
-    if st.button("Inloggen"): # Dutch button
+    if st.button("Inloggen"): 
         try:
-            # Check the password against the English-named secret
             if password_input == st.secrets["APP_PASSWORD"]:
                 st.session_state.logged_in = True
                 set_page(1)
                 st.rerun()
             else:
-                st.error("Wachtwoord onjuist.") # Dutch error
+                st.error("Wachtwoord onjuist.") 
         except KeyError:
-            # Dutch error, but references the correct backend secret name
             st.error("Fout: 'APP_PASSWORD' niet gevonden in Streamlit Secrets. De applicatie is niet correct geconfigureerd.")
         except Exception as e:
-            st.error(f"Er is een fout opgetreden: {e}") # Dutch error
+            st.error(f"Er is een fout opgetreden: {e}") 
 
 # --- MAIN APPLICATION (POST-LOGIN) ---
 else:
     # --- PAGE 1: DOCUMENT UPLOAD ---
     if st.session_state.page == 1:
         st.title("Stap 1: Documenten Uploaden")
-        st.write("Upload een of meerdere PDF-bestanden die je wilt analyseren.")
+        st.write("Upload een of meerdere PDF-bestanden die je wilt analyseren. Je kunt ook een ZIP-bestand uploaden dat PDF's bevat.") # Updated text
         
         uploaded_files = st.file_uploader(
-            "Kies je PDF-bestanden", # Dutch label
-            type="pdf",
+            "Kies je PDF- of ZIP-bestanden", # Updated label
+            type=["pdf", "zip"],            # --- THIS IS THE KEY CHANGE ---
             accept_multiple_files=True,
             key="uploaded_files"
         )
 
         col1, col2 = st.columns([1, 1])
         with col1:
-            if st.button("Uitloggen"): # Dutch button
+            if st.button("Uitloggen"): 
                 logout()
                 st.rerun()
         with col2:
-            if st.button("Volgende Stap: Instructie"): # Dutch button
+            if st.button("Volgende Stap: Instructie"): 
                 if 'uploaded_files' in st.session_state and st.session_state.uploaded_files:
                     set_page(2)
                     st.rerun()
                 else:
-                    st.warning("Upload alsjeblieft eerst een of meerdere PDF-bestanden.") # Dutch warning
+                    st.warning("Upload alsjeblieft eerst een of meerdere bestanden.") # Updated warning
 
     # --- PAGE 2: ANALYSIS PROMPT ---
+    # (This is unchanged from V.05)
     elif st.session_state.page == 2:
         st.title("Stap 2: Analyse Instructie")
         st.write("De AI zal de documenten analyseren en zoeken naar de punten die jij opgeeft. De AI zal *altijd* een samenvatting, analyse en aanbevelingen geven.")
-        
         default_prompt = "Analyseer de documenten. Focus op de belangrijkste risico's, financiële verplichtingen en eventuele tegenstrijdigheden tussen de documenten."
-        
         user_prompt = st.text_area(
-            "Geef hier je specifieke analyse-opdracht:", # Dutch label
+            "Geef hier je specifieke analyse-opdracht:", 
             value=default_prompt,
             height=150,
             key="analysis_prompt"
         )
-
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("Terug naar Upload"): # Dutch button
+            if st.button("Terug naar Upload"): 
                 set_page(1)
                 st.rerun()
         with col2:
-            if st.button("Start Analyse (dit kan even duren)"): # Dutch button
+            if st.button("Start Analyse (dit kan even duren)"): 
                 if 'analysis_prompt' in st.session_state and st.session_state.analysis_prompt:
                     set_page(3) 
                     st.rerun()
                 else:
-                    st.warning("Geef alsjeblieft een instructie op.") # Dutch warning
+                    st.warning("Geef alsjeblieft een instructie op.") 
 
     # --- PAGE 3: RESULTS ---
     elif st.session_state.page == 3:
         st.title("Stap 3: Analyse Resultaten")
         
-        # Run the analysis ONCE and store the result
         if not st.session_state.final_analysis:
-            # 1. Check if all required data is present
             if 'uploaded_files' not in st.session_state or not st.session_state.uploaded_files:
-                st.error("Geen bestanden gevonden. Ga terug naar de uploadpagina.") # Dutch error
+                st.error("Geen bestanden gevonden. Ga terug naar de uploadpagina.") 
                 set_page(1)
             elif 'analysis_prompt' not in st.session_state or not st.session_state.analysis_prompt:
-                st.error("Geen analyse-instructie gevonden. Ga terug naar de instructiepagina.") # Dutch error
+                st.error("Geen analyse-instructie gevonden. Ga terug naar de instructiepagina.") 
                 set_page(2)
             else:
-                # 2. Start the analysis (with a spinner)
-                with st.spinner("Analyse wordt uitgevoerd... Dit kan enkele minuten duren, afhankelijk van de grootte van de documenten."): # Dutch spinner text
+                with st.spinner("Analyse wordt uitgevoerd... Dit kan enkele minuten duren, afhankelijk van de grootte van de documenten."): 
                     try:
-                        # Step A: Read PDFs with citations
-                        st.write("Documenten lezen en voorbereiden...") # Dutch feedback
-                        documents_text = get_pdf_text_with_citations(st.session_state.uploaded_files)
+                        # Step A: Read PDFs and ZIPs with citations
+                        st.write("Documenten lezen en voorbereiden...") 
+                        
+                        # --- THIS IS THE KEY CHANGE ---
+                        documents_text = process_uploaded_files(st.session_state.uploaded_files)
                         
                         if documents_text:
-                            # Step B: Call the AI (no API key passed as arg)
-                            st.write("AI-analyse gestart...") # Dutch feedback
+                            # Step B: Call the AI
+                            st.write("AI-analyse gestart...") 
                             analysis_result = get_gemini_analysis(
                                 SYSTEM_PROMPT_NL,
                                 documents_text,
                                 st.session_state.analysis_prompt
                             )
-                            
                             if analysis_result:
                                 st.session_state.final_analysis = analysis_result
-                                st.success("Analyse voltooid!") # Dutch success
+                                st.success("Analyse voltooid!") 
                             else:
-                                st.error("De AI kon geen resultaat genereren.") # Dutch error
-                                st.session_state.final_analysis = "Analyse mislukt." # Dutch state
-                        
+                                st.error("De AI kon geen resultaat genereren.") 
+                                st.session_state.final_analysis = "Analyse mislukt." 
                         else:
-                            st.error("Kon geen tekst uit de documenten lezen.") # Dutch error
-                            st.session_state.final_analysis = "Analyse mislukt: geen tekst gevonden." # Dutch state
+                            st.error("Kon geen tekst uit de documenten lezen. Zorg dat de bestanden (of ZIPs) leesbare PDF's bevatten.") # Updated error
+                            st.session_state.final_analysis = "Analyse mislukt: geen tekst gevonden." 
                     
                     except Exception as e:
                         st.exception(f"Er is een onverwachte fout opgetreden: {e}")
-                        st.session_state.final_analysis = f"Analyse mislukt: {e}" # Dutch state
+                        st.session_state.final_analysis = f"Analyse mislukt: {e}" 
 
         # 3. Display the final result
         st.markdown("---")
-        st.subheader("Uw Volledige Analyse") # Dutch subheader
+        st.subheader("Uw Volledige Analyse") 
         st.markdown(st.session_state.final_analysis)
         
-        # Button to start a new analysis
-        if st.button("Nieuwe Analyse Starten"): # Dutch button
-            # Reset all states except for login
+        if st.button("Nieuwe Analyse Starten"): 
             st.session_state.page = 1
             st.session_state.uploaded_files = []
             st.session_state.analysis_prompt = ""
             st.session_state.final_analysis = ""
-            st.rerun() # Force a page reload
+            st.rerun() 
         
-        if st.button("Uitloggen"): # Dutch button
+        if st.button("Uitloggen"): 
             logout()
             st.rerun()
