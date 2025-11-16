@@ -1,7 +1,7 @@
 # core/auth.py
 import streamlit as st
 
-ddef check_password():
+def check_password():
     """Returns True if user has entered the correct password."""
     
     password_input = st.text_input("Wachtwoord", type="password", key="login_password") 
