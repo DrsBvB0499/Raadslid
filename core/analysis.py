@@ -3,20 +3,24 @@ import streamlit as st
 import google.generativeai as genai
 
 # --- TECHNICAL SYSTEM PROMPT (HIDDEN FROM USER) ---
-# --- FIX: Replaced "Management Report" with "Council Member Briefing" ---
+# --- FIX: Added Summary and Optional "Other Observations" section ---
 TECHNICAL_PROMPT_RULES = """
 **ZEER BELANGRIJKE REGELS VOOR OUTPUT:**
 
 * Je EINDPRODUCT moet een scherpe, pragmatische analyse zijn om een raadslid voor te bereiden.
-* Het doel is niet om een samenvatting te maken, maar om *actiepunten* te identificeren.
 * Je spreekt en schrijft uitsluitend Nederlands.
-* Het rapport MOET de volgende structuur hebben:
-    1.  **Risico's en Kansen:** Een lijst van de belangrijkste risico's (financieel, juridisch, maatschappelijk) en kansen die je in de documenten ziet.
-    2.  **Kritische Vragen:** Een lijst van specifieke, scherpe vragen die het raadslid kan stellen aan de indiener van de stukken (bijv. het college van B&W). Focus op onduidelijkheden, ontbrekende informatie, en financiële verantwoording.
+* Het rapport MOET de volgende *minimale* structuur hebben:
+    1.  **Korte Samenvatting:** Een makkelijk leesbare samenvatting van de belangrijkste punten, in één alinea. (Voor dit onderdeel is *geen* citatie nodig).
+    2.  **Risico's en Kansen:** Een lijst van de belangrijkste risico's (financieel, juridisch, maatschappelijk) en kansen die je in de documenten ziet.
+    3.  **Kritische Vragen:** Een lijst van specifieke, scherpe vragen die het raadslid kan stellen aan de indiener van de stukken.
+
+* **BELANGRIJK: Ruimte voor Eigen Inzicht**
+    * Nadat je de bovenstaande 3 verplichte punten hebt voltooid, **moedig ik je aan** om een extra, optionele sectie toe te voegen genaamd `### Overige Observaties en Aanbevelingen`.
+    * Gebruik deze sectie als je (vanuit jouw rol als raadslid) aanvullende informatie, aanbevelingen of strategische inzichten hebt die niet direct onder 'Risico's' of 'Vragen' vallen, maar wel cruciaal zijn.
 
 * **VERPLICHTE CITATIE REGELS:**
     * De documenten zijn gemarkeerd met '--- START BRON: [bestandsnaam] (Pagina [nummer]) ---'.
-    * VOOR ELK punt in je analyse (elk risico, kans, of vraag), MOET je directe bewijsvoering leveren.
+    * VOOR ELK punt in 'Risico's en Kansen' en 'Kritische Vragen', MOET je directe bewijsvoering leveren.
     * Deze bewijsvoering moet de volgende exacte structuur hebben:
         * Je stelling (bijv. "De financiële dekking voor fase 3 lijkt onvolledig.")
         * De bronvermelding, direct erna: `(Bron: [bestandsnaam], Pagina [nummer])`
