@@ -79,7 +79,7 @@ def get_gemini_analysis(system_prompt, documents_text, user_prompt):
         api_key = st.secrets["GEMINI_API_KEY"]
         genai.configure(api_key=api_key)
         
-        model = genai.GenerativeModel('gemini-1.5-pro-latest')
+        model = genai.GenerativeModel('gemini-2.5-pro')
         
         prompt_content = [
             system_prompt,
@@ -289,3 +289,4 @@ else:
         if st.button("Uitloggen"): 
             logout()
             st.rerun()
+
