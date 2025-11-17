@@ -4,7 +4,6 @@ import os
 from core.auth import check_password, logout
 from core.file_processing import process_uploaded_files
 from core.analysis import get_gemini_analysis
-# --- FIX: Import our new HTML function ---
 from core.output import create_html_download 
 
 # --- PAGINA CONFIGURATIE ---
@@ -15,7 +14,6 @@ st.set_page_config(
 )
 
 # --- STATE INITIALISATIE ---
-# (Dit hele blok is ongewijzigd)
 if 'page' not in st.session_state:
     st.session_state.page = 0
 if 'logged_in' not in st.session_state:
@@ -38,9 +36,12 @@ if 'persona_prompt' not in st.session_state:
 if 'instructions_prompt' not in st.session_state:
     st.session_state.instructions_prompt = default_instructions
 
+# --- FIX: Add state for the project title ---
+if 'project_title' not in st.session_state:
+    st.session_state.project_title = "Nieuw Project"
+
 
 # --- HELPER FUNCTIES ---
-# (Dit blok is ongewijzigd)
 def set_page(page_num):
     st.session_state.page = page_num
 
@@ -50,7 +51,6 @@ def save_files_to_cache():
 
 
 # --- PAGINA 0: "LOGIN" ---
-# (Deze pagina is ongewijzigd)
 if not st.session_state.logged_in:
     st.image("https://g.co/gemini/share/fac302bc8f46", width=150) 
     st.title("Welkom bij de Analyse Agent")
@@ -87,11 +87,22 @@ else:
                     st.warning("Upload alsjeblieft eerst een of meerdere bestanden.") 
 
     # --- PAGINA 2: ANALYSE INSTRUCTIE ---
-    # (Deze pagina is ongewijzigd)
     elif st.session_state.page == 2:
         st.title("Stap 2: Analyse Instructie")
-        st.write("Pas hier de persona van de AI en je specifieke opdracht aan.")
+        st.write("Geef je project een titel en pas (optioneel) de AI-instructies aan.")
         
+        # --- FIX: Add Project Title input ---
+        st.subheader("Project Titel")
+        st.write("Deze titel wordt gebruikt als kop in de app en in het gedownloade rapport.")
+        title_value = st.text_input(
+            "Project Titel:",
+            value=st.session_state.project_title,
+            label_visibility="collapsed"
+        )
+        st.session_state.project_title = title_value
+        st.markdown("---")
+        
+        st.subheader("AI Instructies")
         persona_value = st.text_area(
             "Generieke Persona:", 
             value=st.session_state.persona_prompt,
@@ -113,17 +124,17 @@ else:
                 st.rerun()
         with col2:
             if st.button("Start Analyse (dit kan even duren)"): 
-                if st.session_state.persona_prompt and st.session_state.instructions_prompt:
+                if st.session_state.persona_prompt and st.session_state.instructions_prompt and st.session_state.project_title:
                     set_page(3) 
                     st.rerun()
                 else:
-                    st.warning("Zorg dat beide instructievelden zijn ingevuld.") 
+                    st.warning("Zorg dat de Project Titel en beide instructievelden zijn ingevuld.") 
 
     # --- PAGINA 3: RESULTATEN ---
     elif st.session_state.page == 3:
-        st.title("Stap 3: Analyse Resultaten")
+        # --- FIX: Use project title for the page header ---
+        st.title(f"Analyse: {st.session_state.project_title}")
         
-        # (Dit analyse-blok is ongewijzigd)
         if not st.session_state.final_analysis:
             if not st.session_state.file_cache:
                 st.error("Geen bestanden gevonden. Ga terug naar de uploadpagina.") 
@@ -165,18 +176,23 @@ else:
         st.subheader("Uw Volledige Analyse") 
         st.markdown(st.session_state.final_analysis)
         
-        # --- FIX: Vervang de .txt knop door de .html knop ---
         if st.session_state.final_analysis:
-            # Creëer de HTML-inhoud
             html_content = create_html_download(
                 st.session_state.final_analysis,
-                title="Analyse Raadsstukken"
+                # --- FIX: Use project title for the download ---
+                title=st.session_state.project_title
             )
+            
+            # --- FIX: Create a dynamic filename from the title ---
+            safe_filename = "".join(c for c in st.session_state.project_title if c.isalnum() or c in (' ', '-')).rstrip()
+            safe_filename = safe_filename.replace(" ", "_")
+            download_filename = f"Analyse_{safe_filename}.html"
+            
             st.download_button(
                 label="Download Analyse (.html)",
-                data=html_content,           # De HTML-string
-                file_name="analyse.html",    # De bestandsnaam
-                mime="text/html"             # Het bestandstype
+                data=html_content,
+                file_name=download_filename,
+                mime="text/html"
             )
         
         if st.button("Nieuwe Analyse Starten"): 
