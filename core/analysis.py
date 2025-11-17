@@ -1,26 +1,34 @@
 # core/analysis.py
 import streamlit as st
 import google.generativeai as genai
+from datetime import datetime # --- FIX: Import datetime ---
 
 # --- TECHNICAL SYSTEM PROMPT (HIDDEN FROM USER) ---
-# --- FIX: Added Summary and Optional "Other Observations" section ---
+# --- FIX: Added "Metagegevens" as the first required step ---
 TECHNICAL_PROMPT_RULES = """
 **ZEER BELANGRIJKE REGELS VOOR OUTPUT:**
 
-* Je EINDPRODUCT moet een scherpe, pragmatische analyse zijn om een raadslid voor te bereiden.
+* Je EINDPRODUCT moet een scherp, pragmatisch analyserapport zijn om een raadslid voor te bereiden.
 * Je spreekt en schrijft uitsluitend Nederlands.
 * Het rapport MOET de volgende *minimale* structuur hebben:
-    1.  **Korte Samenvatting:** Een makkelijk leesbare samenvatting van de belangrijkste punten, in één alinea. (Voor dit onderdeel is *geen* citatie nodig).
-    2.  **Risico's en Kansen:** Een lijst van de belangrijkste risico's (financieel, juridisch, maatschappelijk) en kansen die je in de documenten ziet.
-    3.  **Kritische Vragen:** Een lijst van specifieke, scherpe vragen die het raadslid kan stellen aan de indiener van de stukken.
+
+    1.  **Metagegevens:** Start met deze sectie. Maak een lijst (geen tabel) met de volgende 3 punten:
+        * **Datum Analyse:** [Gebruik de 'HUIDIGE DATUM' die in de prompt is opgegeven]
+        * **Datum Bespreking:** [Schrijf "Niet gespecificeerd in documenten" (tenzij je het echt vindt)]
+        * **Geanalyseerde Documenten:** [Lijst de bestandsnamen op die je in de 'START BRON' tags hebt gezien]
+    
+    2.  **Korte Samenvatting:** Een makkelijk leesbare samenvatting van de belangrijkste punten, in één alinea. (Voor dit onderdeel is *geen* citatie nodig).
+
+    3.  **Risico's en Kansen:** Een lijst van de belangrijkste risico's (financieel, juridisch, maatschappelijk) en kansen die je in de documenten ziet.
+    
+    4.  **Kritische Vragen:** Een lijst van specifieke, scherpe vragen die het raadslid kan stellen aan de indiener van de stukken.
 
 * **BELANGRIJK: Ruimte voor Eigen Inzicht**
-    * Nadat je de bovenstaande 3 verplichte punten hebt voltooid, **moedig ik je aan** om een extra, optionele sectie toe te voegen genaamd `### Overige Observaties en Aanbevelingen`.
-    * Gebruik deze sectie als je (vanuit jouw rol als raadslid) aanvullende informatie, aanbevelingen of strategische inzichten hebt die niet direct onder 'Risico's' of 'Vragen' vallen, maar wel cruciaal zijn.
+    * Nadat je de bovenstaande 4 verplichte punten hebt voltooid, **moedig ik je aan** om een extra, optionele sectie toe te voegen genaamd `### Overige Observaties en Aanbevelingen`.
 
 * **VERPLICHTE CITATIE REGELS:**
     * De documenten zijn gemarkeerd met '--- START BRON: [bestandsnaam] (Pagina [nummer]) ---'.
-    * VOOR ELK punt in 'Risico's en Kansen' en 'Kritische Vragen', MOET je directe bewijsvoering leveren.
+    * VOOR ELK punt in 'Risico's en Kansen' en 'Kritische Vragen' (en 'Overige Observaties'), MOET je directe bewijsvoering leveren.
     * Deze bewijsvoering moet de volgende exacte structuur hebben:
         * Je stelling (bijv. "De financiële dekking voor fase 3 lijkt onvolledig.")
         * De bronvermelding, direct erna: `(Bron: [bestandsnaam], Pagina [nummer])`
@@ -38,18 +46,19 @@ def get_gemini_analysis(persona_prompt, instructions_prompt, documents_text):
         api_key = st.secrets["GEMINI_API_KEY"]
         genai.configure(api_key=api_key)
         
-        # Correct model name
         model = genai.GenerativeModel('gemini-2.5-pro') 
         
-        # Combine all prompts into the final system instruction
         final_system_prompt = f"""
 {persona_prompt}
 
 {TECHNICAL_PROMPT_RULES}
 """
+        # --- FIX: Get current date and add it to the prompt ---
+        now_str = datetime.now().strftime("%d-%m-%Y")
         
         prompt_content = [
             final_system_prompt,
+            f"\n--- HUIDIGE DATUM (voor 'Datum Analyse') ---\n{now_str}",
             f"\n--- SPECIFIEKE OPDRACHT VAN DE GEBRUIKER ---\n{instructions_prompt}", 
             "\n--- START VOLLEDIGE TEKST DOCUMENTEN ---\n" + documents_text
         ]
