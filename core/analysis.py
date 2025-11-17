@@ -48,7 +48,7 @@ def get_gemini_analysis(persona_prompt, instructions_prompt, documents_text):
         api_key = st.secrets["GEMINI_API_KEY"]
         genai.configure(api_key=api_key)
         
-        model = genai.GenerativeModel('gemini-2.5-pro') Row: 110, Col: 42
+        model = genai.GenerativeModel('gemini-2.5-pro')
         
         final_system_prompt = f"""
 {persona_prompt}
