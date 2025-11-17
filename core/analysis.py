@@ -1,13 +1,14 @@
 # core/analysis.py
 import streamlit as st
 import google.generativeai as genai
-from datetime import datetime # --- FIX: Import datetime ---
+from datetime import datetime
 
 # --- TECHNICAL SYSTEM PROMPT (HIDDEN FROM USER) ---
-# --- FIX: Added "Metagegevens" as the first required step ---
+# --- FIX: Added strict rules to remove "email" text ---
 TECHNICAL_PROMPT_RULES = """
 **ZEER BELANGRIJKE REGELS VOOR OUTPUT:**
 
+* **Begin je antwoord *direct* met de 'Metagegevens' sectie. Voeg *geen* aanhef, begroeting (zoals 'Beste collega,') of persoonlijke introductie toe.**
 * Je EINDPRODUCT moet een scherp, pragmatisch analyserapport zijn om een raadslid voor te bereiden.
 * Je spreekt en schrijft uitsluitend Nederlands.
 * Het rapport MOET de volgende *minimale* structuur hebben:
@@ -23,7 +24,7 @@ TECHNICAL_PROMPT_RULES = """
     
     4.  **Kritische Vragen:** Een lijst van specifieke, scherpe vragen die het raadslid kan stellen aan de indiener van de stukken.
 
-* **BELANGRIJK: Ruimte voor Eigen Inzicht**
+* **BELANGRIJKE: Ruimte voor Eigen Inzicht**
     * Nadat je de bovenstaande 4 verplichte punten hebt voltooid, **moedig ik je aan** om een extra, optionele sectie toe te voegen genaamd `### Overige Observaties en Aanbevelingen`.
 
 * **VERPLICHTE CITATIE REGELS:**
@@ -35,6 +36,7 @@ TECHNICAL_PROMPT_RULES = """
         * Het exacte citaat, op een nieuwe regel:
             > **Citaat:** "...[de letterlijke tekst uit het document die je stelling bewijst]..."
 * Baseer je analyse *uitsluitend* op de verstrekte tekst.
+* **Eindig je antwoord *direct* na het laatste punt. Voeg *geen* afsluiting (zoals 'Met vriendelijke groet,') toe.**
 """
 
 def get_gemini_analysis(persona_prompt, instructions_prompt, documents_text):
@@ -46,14 +48,13 @@ def get_gemini_analysis(persona_prompt, instructions_prompt, documents_text):
         api_key = st.secrets["GEMINI_API_KEY"]
         genai.configure(api_key=api_key)
         
-        model = genai.GenerativeModel('gemini-2.5-pro') 
+        model = genai.GenerativeModel('gemini-2.5-pro') Row: 110, Col: 42
         
         final_system_prompt = f"""
 {persona_prompt}
 
 {TECHNICAL_PROMPT_RULES}
 """
-        # --- FIX: Get current date and add it to the prompt ---
         now_str = datetime.now().strftime("%d-%m-%Y")
         
         prompt_content = [
