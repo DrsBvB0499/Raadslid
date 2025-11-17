@@ -30,8 +30,11 @@ def logout():
     st.session_state.file_cache = []
     st.session_state.file_uploader_key = None
     
-    # --- Clear the correct prompt keys ---
     if 'persona_prompt' in st.session_state:
         del st.session_state.persona_prompt
     if 'instructions_prompt' in st.session_state:
         del st.session_state.instructions_prompt
+        
+    # --- FIX: Add this line to clear the project title ---
+    if 'project_title' in st.session_state:
+        del st.session_state.project_title
